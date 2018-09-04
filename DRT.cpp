@@ -507,7 +507,7 @@ int  main(int argc,  char * argv[])
                 size_t  cbWork  = 0;
                 cbWork  = writeImageBlock(
                                 &fiIn, &gifHead, &(bkInfo.imgBlk),
-                                pW);
+                                pW + cbWrite);
                 pR      += cbRead;
                 cbWrite += cbWork;
 #if defined( _DEBUG )
