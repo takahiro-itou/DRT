@@ -166,14 +166,36 @@ label_finalize_file_if_error:
 
 
 //----------------------------------------------------------------
+/**   拡張ブロックを読み込む。
+**
+**  @param [in] ptrBuf
+**  @param [in] fInfo
+**  @param[out] bkInfo
+**  @return     読み込んだバイト数。
+**/
+
+size_t
+readExtensionBlock(
+        const  LpcReadBuf   ptrBuf,
+        const  FileInfo *   fInfo,
+        BlockInfo  *        bkInfo)
+{
+}
+
+
+//----------------------------------------------------------------
 /**   ファイルヘッダを読み込む。
 **
+**  @param [in] ptrBuf
+**  @param [in] fInfo
+**  @param[out] exBlock
+**  @return     読み込んだバイト数。
 **/
 
 size_t
 readFileHeader(
-        const   LpcReadBuf  ptrBuf,
-        const   FileInfo    fiInfo,
+        const  LpcReadBuf   ptrBuf,
+        const  FileInfo  *  fInfo,
         FileHeader  *       gifHead)
 {
     memcpy(gifHead->signature, ptrBuf + 0, 3);
@@ -196,15 +218,15 @@ readFileHeader(
     }
     gifHead->screenWidth    = *((unsigned short *)(ptrBuf + 6));
     gifHead->screenHeight   = *((unsigned short *)(ptrBuf + 8));
-    unsigned char   flg     = *((unsigned char *)(ptrBuf + 10));
+    unsigned char   flg     = *((ptrBuf + 10));
 
     gifHead->flgGCR         = (flg & 0x80);
     gifHead->colorResol     = (flg >> 4) & 0x07;
     gifHead->flgSort        = (flg & 0x08);
     gifHead->sizeGCR        = (flg & 0x07);
 
-    gifHead->bgIndex        = *((unsigned char *)(ptrBuf + 11));
-    gifHead->aspectRatio    = *((unsigned char *)(ptrBuf + 12));
+    gifHead->bgIndex        = *((ptrBuf + 11));
+    gifHead->aspectRatio    = *((ptrBuf + 12));
 
     if ( gifHead->flgGCR ) {
         gifHead->gColorSize = 0;
@@ -217,6 +239,30 @@ readFileHeader(
     memcpy(gifHead->gColorTable, ptrBuf + 13, gpSize * 3);
 
     return ( gpSize + 13 );
+}
+
+
+//----------------------------------------------------------------
+/**   次のブロックを読み込む。
+**
+**  @param [in] ptrBuf
+**  @param [in] fInfo
+**  @param[out] bkInfo
+**  @return     読み込んだバイト数。
+**/
+
+size_t
+readNextBlock(
+        const  LpcReadBuf   ptrBuf,
+        const  FileInfo *   fInfo,
+        BlockInfo  *        bkInfo)
+{
+    const   UByte8  ubType  = *(ptrBuf);
+    bkInfo->ubType  = ubType;
+
+    if ( ubType == 0x2C ) {
+    } else if ( ubType == 0x21 ) {
+    }
 }
 
 
@@ -239,6 +285,7 @@ int  main(int argc,  char * argv[])
     size_t  cbTotal = 0;
     size_t  cbReqs  = 0;
     size_t  cbWrite = 0;
+    size_t  cbRead  = 0;
 
     for ( int i = 2; i < argc; ++ i ) {
         cbTotal += getFileLength(argv[i]);
@@ -257,20 +304,26 @@ int  main(int argc,  char * argv[])
     //  先頭のファイルを開く。  //
     {
         FileInfo    fiIn;
-        LpcReadBuf  pR  = openGIFfile(argv[2], &fiIn);
+        FileHeader  gifHead;
 
-        memcpy(pW + cbWrite, pR, (fiIn.cbSize) - 1);
-        cbWrite += (fbIn.cbSize - 1);
+        LpcReadBuf  pR  = openGIFfile(argv[2], &fiIn);
+        cbRead  = readFileHeader(pR, &fiIn, &gifHead);
+
+        memcpy(pW + cbWrite, pR, fiIn.cbSize - 1);
+        cbWrite += (fiIn.cbSize - 1);
 
         closeGIFFile(&fiIn, 0);
     }
 
     for ( int i = 3; i < argc; ++ i ) {
         FileInfo    fiIn;
-        LpcReadBuf  pR  = openGIFfile(argv[i], &fiIn);
+        FileHeader  gifHead;
 
-        memcpy(pW + cbWrite, pR + 19, (fiIn.cbSize) - 1);
-        cbWrite += (fiIn.cbSize - 20);
+        LpcReadBuf  pR  = openGIFfile(argv[i], &fiIn);
+        cbRead  = readFileHeader(pR, &fiIn, &gifHead);
+
+        memcpy(pW + cbWrite, pR + cbRead, (fiIn.cbSize) - cbRead - 1);
+        cbWrite += (fiIn.cbSize - cbRead - 1);
 
         closeGIFFile(&fiIn, 0);
     }
