@@ -1,6 +1,6 @@
 
 #if 0
-g++   -o  DRT.exe  -D_DEBUG  DRT.cpp
+g++   -o  DRT.exe  -DNDEBUG  DRT.cpp
 exit  0
 #endif
 
