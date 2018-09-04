@@ -409,15 +409,48 @@ int  main(int argc,  char * argv[])
     for ( int i = 3; i < argc; ++ i ) {
         FileInfo    fiIn;
         FileHeader  gifHead;
+        BlockInfo   bkInfo;
 
         LpcReadBuf  pR  = openGIFfile(argv[i], &fiIn);
         cbRead  = readFileHeader(pR, &fiIn, &gifHead);
+        pR  +=  cbRead;
 
-        memcpy(pW + cbWrite, pR + cbRead, (fiIn.cbSize) - cbRead - 1);
-        cbWrite += (fiIn.cbSize - cbRead - 1);
+        while ( cbRead > 2 ) {
+            cbRead  = readNextBlock(pR, &fiIn, &bkInfo);
+            fprintf(stderr,
+                    "#DEBUG : Read: "
+                    "%ld bytes, Type = %02x %02x, Offs = %ld\n",
+                    cbRead, bkInfo.ubType, bkInfo.exType,
+                    bkInfo.blkOffs);
+
+            if ( cbRead == 0 ) {
+                //  無効なデータフォーマット。  //
+                fprintf(stderr, "Invalid Format Finded.\n");
+                exit ( 1 );
+            }
+            if ( cbRead == 1 ) {
+                //  終了ブロック。  //
+                break;
+            }
+
+            if ( bkInfo.ubType == 0x21 && bkInfo.exType == 0xFF ) {
+                //  アプリケーションブロック。          //
+                //  先頭に一度だけでよいのでスキップ。  //
+                pR  += (cbRead);
+                continue;
+            }
+
+            memcpy(pW + cbWrite, pR, cbRead);
+            pR      += (cbRead);
+            cbWrite += (cbRead);
+        }
 
         closeGIFFile(&fiIn, 0);
     }
+
+    //  最後にフッターを書き込む。  //
+    pW[cbWrite] = 0x3B;
+    ++  cbWrite;
 
     fprintf(stderr, "Total Write Size: %ld Bytes.\n", cbWrite);
     closeGIFFile(&fiOut, cbWrite);
