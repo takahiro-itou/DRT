@@ -12,7 +12,7 @@ struct  FileInfo
     LpWriteBuf  ptrBuf;     /**<  ファイルのデータ。        **/
 };
 
-struct  Header
+struct  FileHeader
 {
     char    signature[3];
     char    version[3];
@@ -24,6 +24,7 @@ struct  Header
     int     sizeGCR;
     int     bgIndex;
     int     aspectRatio;
+    int     gColorSize;
     char    gColorTable[256 * 3];
 };
 

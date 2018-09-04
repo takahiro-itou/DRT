@@ -165,6 +165,66 @@ label_finalize_file_if_error:
 }
 
 
+//----------------------------------------------------------------
+/**   ファイルヘッダを読み込む。
+**
+**/
+
+size_t
+readFileHeader(
+        const   LpcReadBuf  ptrBuf,
+        const   FileInfo    fiInfo,
+        FileHeader  *       gifHead)
+{
+    memcpy(gifHead->signature, ptrBuf + 0, 3);
+    memcpy(gifHead->version,   ptrBuf + 3, 3);
+
+    if ( (ptrBuf[0] == 'G') && (ptrBuf[1] == 'I') && (ptrBuf[2] == 'F') )
+    {
+        //  OK  //
+    } else {
+        fprintf(stderr, "Invalid File Header.\n");
+        return ( 0 );
+    }
+
+    if ( (ptrBuf[3] == '8') && (ptrBuf[4] == '9') && (ptrBuf[5] == 'a') )
+    {
+        //  OK  //
+    } else {
+        fprintf(stderr, "Unsupported Version.\n");
+        return ( 0 );
+    }
+    gifHead->screenWidth    = *((unsigned short *)(ptrBuf + 6));
+    gifHead->screenHeight   = *((unsigned short *)(ptrBuf + 8));
+    unsigned char   flg     = *((unsigned char *)(ptrBuf + 10));
+
+    gifHead->flgGCR         = (flg & 0x80);
+    gifHead->colorResol     = (flg >> 4) & 0x07;
+    gifHead->flgSort        = (flg & 0x08);
+    gifHead->sizeGCR        = (flg & 0x07);
+
+    gifHead->bgIndex        = *((unsigned char *)(ptrBuf + 11));
+    gifHead->aspectRatio    = *((unsigned char *)(ptrBuf + 12));
+
+    if ( gifHead->flgGCR ) {
+        gifHead->gColorSize = 0;
+    } else {
+        //  gifHead->gColorSize = 1 << (gifHead->sizeGCR + 1);
+        gifHead->gColorSize = 2 << (gifHead->sizeGCR);
+    }
+
+    const   size_t  gpSize  = (gifHead->gColorSize) * 3;
+    memcpy(gifHead->gColorTable, ptrBuf + 13, gpSize * 3);
+
+    return ( gpSize + 13 );
+}
+
+
+//----------------------------------------------------------------
+/**   エントリポイント。
+**
+**/
+
 int  main(int argc,  char * argv[])
 {
     if ( argc <= 2 ) {
@@ -194,17 +254,23 @@ int  main(int argc,  char * argv[])
         exit ( 1 );
     }
 
-    for ( int i = 2; i < argc; ++ i ) {
+    //  先頭のファイルを開く。  //
+    {
+        FileInfo    fiIn;
+        LpcReadBuf  pR  = openGIFfile(argv[2], &fiIn);
+
+        memcpy(pW + cbWrite, pR, (fiIn.cbSize) - 1);
+        cbWrite += (fbIn.cbSize - 1);
+
+        closeGIFFile(&fiIn, 0);
+    }
+
+    for ( int i = 3; i < argc; ++ i ) {
         FileInfo    fiIn;
         LpcReadBuf  pR  = openGIFfile(argv[i], &fiIn);
 
-        if ( i == 2 ) {
-            memcpy(pW + cbWrite, pR, (fiIn.cbSize) - 1);
-            cbWrite += (fiIn.cbSize - 1);
-        } else {
-            memcpy(pW + cbWrite, pR + 19, (fiIn.cbSize) - 1);
-            cbWrite += (fiIn.cbSize - 20);
-        }
+        memcpy(pW + cbWrite, pR + 19, (fiIn.cbSize) - 1);
+        cbWrite += (fiIn.cbSize - 20);
 
         closeGIFFile(&fiIn, 0);
     }
