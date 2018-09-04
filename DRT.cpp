@@ -404,10 +404,11 @@ writeImageBlock(
     memcpy(ptrBuf + 10, gifHead->gColorTable, gpSize);
 
     LpWriteBuf  pW  = ptrBuf + 10 + (gpSize);
-    pW[1]   = ptrBuf[10];
-    pW      += 2;
+    * (pW)  = ptrBuf[10];
+    ++  pW;
 
     memcpy(pW, imgBlk->ptrImgs, imgBlk->cbImgs);
+    pW  += (imgBlk->cbImgs);
 
     return ( pW - ptrBuf );
 }
