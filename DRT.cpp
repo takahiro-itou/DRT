@@ -350,7 +350,7 @@ readNextBlock(
                         &(bkInfo->imgBlk) );
     } else if ( ubType == 0x21 ) {
         retVal  = readExtensionBlock(
-                        ptrBuf, fInfo, blkInfo);
+                        ptrBuf, fInfo, bkInfo);
     }
 
     return ( retVal );
