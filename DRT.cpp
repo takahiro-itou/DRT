@@ -180,6 +180,21 @@ readExtensionBlock(
         const  FileInfo *   fInfo,
         BlockInfo  *        bkInfo)
 {
+    bkInfo->ubType  = ptrBuf[0];
+    bkInfo->exType  = ptrBuf[1];
+    bkInfo->blkOffs = ptrBuf - (fInfo->ptrBuf);
+    bkInfo->cbTotal = 0;
+    bkInfo->ptrAddr = ptrBuf;
+
+    LpcReadBuf  pR  = ptrBuf + 2;
+
+    for ( ;; ) {
+        size_t  cbSize  = *(pR ++ );
+        if ( cbSize == 0 ) { break; }
+        pR  += cbSize;
+    }
+
+    return ( bkInfo->cbTotal = (pR - ptrBuf) );
 }
 
 
@@ -242,7 +257,6 @@ readFileHeader(
 }
 
 
-
 //----------------------------------------------------------------
 /**   イメージブロックを読み込む。
 **
@@ -286,8 +300,9 @@ readImageBlock(
 
     const   size_t  lpSize  = (imgBlk->lColorSize * 3);
     memcpy(imgBlk->lColorTable, ptrBuf + 10, lpSize);
+    imgBlk->minCode = *(ptrBuf + 10 + lpSize);
 
-    LpcReadBuf  pR  = ptrBuf + 10 + lpSize;
+    LpcReadBuf  pR  = ptrBuf + 11 + lpSize;
     for ( ;; ) {
         const   size_t  cbSize  = *(pR ++);
         if ( cbSize == 0 ) { break; }
@@ -326,11 +341,16 @@ readNextBlock(
 
     size_t  retVal  = 0;
 
-    if ( ubType == 0x2C ) {
+    if ( ubType == 0x3B ) {
+        //  フッター。  //
+        return ( 1 );
+    } else if ( ubType == 0x2C ) {
         retVal  = readImageBlock(
-                        ptrBuf, fInfo, bkInfo, &(bkInfo->imgBlk) );
+                        ptrBuf, fInfo, bkInfo,
+                        &(bkInfo->imgBlk) );
     } else if ( ubType == 0x21 ) {
-
+        retVal  = readExtensionBlock(
+                        ptrBuf, fInfo, blkInfo);
     }
 
     return ( retVal );
