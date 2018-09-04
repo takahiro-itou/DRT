@@ -218,8 +218,8 @@ readFileHeader(
     }
     gifHead->screenWidth    = *((unsigned short *)(ptrBuf + 6));
     gifHead->screenHeight   = *((unsigned short *)(ptrBuf + 8));
-    unsigned char   flg     = *((ptrBuf + 10));
 
+    const   UByte8  flg     = *((ptrBuf + 10));
     gifHead->flgGCR         = (flg & 0x80);
     gifHead->colorResol     = (flg >> 4) & 0x07;
     gifHead->flgSort        = (flg & 0x08);
@@ -229,16 +229,80 @@ readFileHeader(
     gifHead->aspectRatio    = *((ptrBuf + 12));
 
     if ( gifHead->flgGCR ) {
-        gifHead->gColorSize = 0;
-    } else {
         //  gifHead->gColorSize = 1 << (gifHead->sizeGCR + 1);
         gifHead->gColorSize = 2 << (gifHead->sizeGCR);
+    } else {
+        gifHead->gColorSize = 0;
     }
 
     const   size_t  gpSize  = (gifHead->gColorSize) * 3;
     memcpy(gifHead->gColorTable, ptrBuf + 13, gpSize * 3);
 
     return ( gpSize + 13 );
+}
+
+
+
+//----------------------------------------------------------------
+/**   イメージブロックを読み込む。
+**
+**  @param [in] ptrBuf
+**  @param [in] fInfo
+**  @param[out] bkInfo
+**  @return     読み込んだバイト数。
+**/
+
+size_t
+readImageBlock(
+        const  LpcReadBuf   ptrBuf,
+        const  FileInfo *   fInfo,
+        BlockInfo  *        bkInfo,
+        ImageBlock  *       imgBlk)
+{
+    imgBlk->imgSep  = ptrBuf[0];
+    imgBlk->blkOffs = ptrBuf - (fInfo->ptrBuf);
+    imgBlk->cbTotal = 0;
+    imgBlk->ptrAddr = ptrBuf;
+
+    imgBlk->imgLeft = *((unsigned short *)(ptrBuf + 1));
+    imgBlk->imgTop  = *((unsigned short *)(ptrBuf + 3));
+    imgBlk->imgW    = *((unsigned short *)(ptrBuf + 5));
+    imgBlk->imgH    = *((unsigned short *)(ptrBuf + 7));
+
+    const   UByte8  flg     = *((ptrBuf + 9));
+    imgBlk->packed  = flg;
+    imgBlk->flgLCT  = (flg & 0x80);
+    imgBlk->flgIntr = (flg & 0x40);
+    imgBlk->flgSort = (flg & 0x20);
+    imgBlk->pfRsrv  = (flg >> 3) & 0x03;
+    imgBlk->sizeLCT = (flg & 0x07);
+
+    if ( imgBlk->flgLCT ) {
+        //  imgBlk->lColorSize  = 1 << (imgBlk->sizeLCT + 1);
+        imgBlk->lColorSize  = 2 << (imgBlk->sizeLCT);
+    } else {
+        imgBlk->lColorSize  = 0;
+    }
+
+    const   size_t  lpSize  = (imgBlk->lColorSize * 3);
+    memcpy(imgBlk->lColorTable, ptrBuf + 10, lpSize);
+
+    LpcReadBuf  pR  = ptrBuf + 10 + lpSize;
+    for ( ;; ) {
+        const   size_t  cbSize  = *(pR ++);
+        if ( cbSize == 0 ) { break; }
+        pR  += cbSize;
+    }
+
+    imgBlk->cbTotal = (pR - ptrBuf);
+
+    bkInfo->ubType  = imgBlk->imgSep;
+    bkInfo->exType  = 0;
+    bkInfo->blkOffs = imgBlk->blkOffs;
+    bkInfo->cbTotal = imgBlk->cbTotal;
+    bkInfo->ptrAddr = imgBlk->ptrAddr;
+
+    return ( imgBlk->cbTotal );
 }
 
 
@@ -260,9 +324,16 @@ readNextBlock(
     const   UByte8  ubType  = *(ptrBuf);
     bkInfo->ubType  = ubType;
 
+    size_t  retVal  = 0;
+
     if ( ubType == 0x2C ) {
+        retVal  = readImageBlock(
+                        ptrBuf, fInfo, bkInfo, &(bkInfo->imgBlk) );
     } else if ( ubType == 0x21 ) {
+
     }
+
+    return ( retVal );
 }
 
 
