@@ -343,6 +343,11 @@ readNextBlock(
 
     if ( ubType == 0x3B ) {
         //  フッター。  //
+        bkInfo->exType  = 0;
+        bkInfo->blkOffs = ptrBuf - (fInfo->ptrBuf);
+        bkInfo->cbTotal = 1;
+        bkInfo->ptrAddr = ptrBuf;
+
         return ( 1 );
     } else if ( ubType == 0x2C ) {
         retVal  = readImageBlock(
@@ -409,13 +414,14 @@ int  main(int argc,  char * argv[])
     for ( int i = 3; i < argc; ++ i ) {
         FileInfo    fiIn;
         FileHeader  gifHead;
-        BlockInfo   bkInfo;
 
         LpcReadBuf  pR  = openGIFfile(argv[i], &fiIn);
         cbRead  = readFileHeader(pR, &fiIn, &gifHead);
         pR  +=  cbRead;
 
         while ( cbRead > 2 ) {
+            BlockInfo   bkInfo;
+
             cbRead  = readNextBlock(pR, &fiIn, &bkInfo);
             fprintf(stderr,
                     "#DEBUG : Read: "
@@ -433,10 +439,11 @@ int  main(int argc,  char * argv[])
                 break;
             }
 
-            if ( bkInfo.ubType == 0x21 && bkInfo.exType == 0xFF ) {
+            if ( (bkInfo.ubType == 0x21) && (bkInfo.exType == 0xFF) ) {
                 //  アプリケーションブロック。          //
                 //  先頭に一度だけでよいのでスキップ。  //
                 pR  += (cbRead);
+                fprintf(stderr, "#DEBUG : Skip Application Block.\n");
                 continue;
             }
 
