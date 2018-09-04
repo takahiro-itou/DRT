@@ -1,6 +1,6 @@
 
 #if 0
-g++   -o  DRT.exe  DRT.cpp
+g++   -o  DRT.exe  -D_DEBUG  DRT.cpp
 exit  0
 #endif
 
@@ -303,6 +303,8 @@ readImageBlock(
     imgBlk->minCode = *(ptrBuf + 10 + lpSize);
 
     LpcReadBuf  pR  = ptrBuf + 11 + lpSize;
+    imgBlk->ptrImgs = pR;
+
     for ( ;; ) {
         const   size_t  cbSize  = *(pR ++);
         if ( cbSize == 0 ) { break; }
@@ -310,6 +312,13 @@ readImageBlock(
     }
 
     imgBlk->cbTotal = (pR - ptrBuf);
+    imgBlk->cbImgs  = (pR - (imgBlk->ptrImgs));
+
+#if defined( _DEBUG )
+    fprintf(stderr,
+            "#DEBUG : Image: Total = %ld, CT = %ld, Imgs = %ld\n",
+            imgBlk->cbTotal, imgBlk->lColorSize, imgBlk->cbImgs);
+#endif
 
     bkInfo->ubType  = imgBlk->imgSep;
     bkInfo->exType  = 0;
@@ -361,6 +370,47 @@ readNextBlock(
     return ( retVal );
 }
 
+
+//----------------------------------------------------------------
+/**   イメージブロックを書き込む。
+**
+**  @param [in] fInfo
+**  @param [in] gifHead
+**  @param [in] imgBlk
+**  @param[out] ptrBuf
+**  @return     書き込んだバイト数。
+**/
+
+size_t
+writeImageBlock(
+        const   FileInfo  *     fInfo,
+        const   FileHeader  *   gifHead,
+        const   ImageBlock  *   imgBlk,
+        LpWriteBuf  const       ptrBuf)
+{
+    //  ローカルカラーテーブルの有無を確認し、  //
+    //  なければ、グローバルからコピーする。    //
+    if ( imgBlk->flgLCT ) {
+        memcpy(ptrBuf, imgBlk->ptrAddr, imgBlk->cbTotal);
+        return ( imgBlk->cbTotal );
+    }
+
+    memcpy(ptrBuf, imgBlk->ptrAddr,  10);
+    ptrBuf[9]   = (imgBlk->flgIntr)
+            | (imgBlk->flgSort)
+            | (imgBlk->pfRsrv)
+            | ((gifHead->sizeGCR) & 0x07) | 0x80;
+    const   size_t  gpSize  = (gifHead->gColorSize) * 3;
+    memcpy(ptrBuf + 10, gifHead->gColorTable, gpSize);
+
+    LpWriteBuf  pW  = ptrBuf + 10 + (gpSize);
+    pW[1]   = ptrBuf[10];
+    pW      += 2;
+
+    memcpy(pW, imgBlk->ptrImgs, imgBlk->cbImgs);
+
+    return ( pW - ptrBuf );
+}
 
 //----------------------------------------------------------------
 /**   エントリポイント。
@@ -423,11 +473,13 @@ int  main(int argc,  char * argv[])
             BlockInfo   bkInfo;
 
             cbRead  = readNextBlock(pR, &fiIn, &bkInfo);
+#if defined( _DEBUG )
             fprintf(stderr,
                     "#DEBUG : Read: "
                     "%ld bytes, Type = %02x %02x, Offs = %ld\n",
                     cbRead, bkInfo.ubType, bkInfo.exType,
                     bkInfo.blkOffs);
+#endif
 
             if ( cbRead == 0 ) {
                 //  無効なデータフォーマット。  //
@@ -443,7 +495,24 @@ int  main(int argc,  char * argv[])
                 //  アプリケーションブロック。          //
                 //  先頭に一度だけでよいのでスキップ。  //
                 pR  += (cbRead);
+#if defined( _DEBUG )
                 fprintf(stderr, "#DEBUG : Skip Application Block.\n");
+#endif
+                continue;
+            }
+
+            if ( (bkInfo.ubType) == 0x2C ) {
+                //  イメージブロック。  //
+                size_t  cbWork  = 0;
+                cbWork  = writeImageBlock(
+                                &fiIn, &gifHead, &(bkInfo.imgBlk),
+                                pW);
+                pR      += cbRead;
+                cbWrite += cbWork;
+#if defined( _DEBUG )
+                fprintf(stderr, "#DEBUG : Write Image: %ld (%ld)\n",
+                        cbWork, cbRead);
+#endif
                 continue;
             }
 

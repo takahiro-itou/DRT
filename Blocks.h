@@ -70,6 +70,9 @@ typedef  struct
     int         lColorSize;
     ColorTable  lColorTable;
     int         minCode;
+
+    size_t      cbImgs;
+    LpcReadBuf  ptrImgs;
 } ImageBlock;
 
 
